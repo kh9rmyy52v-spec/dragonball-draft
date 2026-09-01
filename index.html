@@ -166,19 +166,47 @@ async function touchPresence(){
 
 function selectChar(c){if(!canControl())return;if(room.draft.phase==="ban")doBan(c);else if(room.draft.phase==="pick")doPick(c)}
 async function updateDraft(mutator){
-  const dRef=ref(db,"rooms/main/draft");
-  const result=await runTransaction(dRef,current=>{
-    current=current||{bans:[],picks:[],phase:"ban",current:0};
-    const next=JSON.parse(JSON.stringify(current));
+  const dRef = ref(db,"rooms/main/draft");
+
+  const result = await runTransaction(dRef,current=>{
+    current = current || {};
+
+    current.bans = Array.isArray(current.bans) ? current.bans : [];
+    current.picks = Array.isArray(current.picks) ? current.picks : [];
+    current.phase = current.phase || "ban";
+    current.current = Number.isInteger(current.current) ? current.current : 0;
+
+    const next = JSON.parse(JSON.stringify(current));
+
     if(!canControl()) return;
+
     mutator(next);
+
     return next;
   });
-  if(!result.committed) return;
+
+  console.log("DRAFT TRANSACTION:", result.committed, result.snapshot.val());
 }
 function doBan(c){
-  const t=banOrder[room.draft.current]; if(t!==role)return;
-  updateDraft(d=>{d.bans.push({team:t,name:c.name,img:c.img});d.current++;if(d.current>=banOrder.length){d.phase="pick";d.current=0;}})
+  const t = banOrder[room.draft.current];
+  if(t !== role) return;
+
+  updateDraft(d => {
+    if(!Array.isArray(d.bans)) d.bans = [];
+
+    d.bans.push({
+      team: t,
+      name: c.name,
+      img: c.img
+    });
+
+    d.current++;
+
+    if(d.current >= banOrder.length){
+      d.phase = "pick";
+      d.current = 0;
+    }
+  });
 }
 function doPick(c){
   const t=pickOrder[room.draft.current]; if(t!==role)return;
