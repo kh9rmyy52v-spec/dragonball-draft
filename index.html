@@ -242,7 +242,17 @@ function undo(){
     if(d.phase==="ban"&&d.bans.length){d.bans.pop();d.current=d.bans.length-1;return;}
   })
 }
-function resetDraft(){if(!canControl())return;if(!confirm("BAN & PICKを最初からやり直しますか？"))return;updateDraft(d=>{d.bans=[];d.picks=[];d.phase="ban";d.current=0})}
+function resetDraft(){
+  if(role!=="A" && role!=="B") return;
+  if(!confirm("BAN & PICKを最初からやり直しますか？")) return;
+
+  updateDraft(d=>{
+    d.bans=[];
+    d.picks=[];
+    d.phase="ban";
+    d.current=0;
+  });
+}
 
 async function writeTeamName(t,val){
   if(suppressNameWrite||role!==t)return;
