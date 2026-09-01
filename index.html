@@ -179,11 +179,9 @@ async function updateDraft(mutator){
 
     const next = JSON.parse(JSON.stringify(current));
 
-    if(!canControl()) return;
-
     mutator(next);
 
-    return next;
+return next;
   });
 
   console.log("DRAFT TRANSACTION:", result.committed, result.snapshot.val());
