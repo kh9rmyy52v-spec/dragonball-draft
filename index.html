@@ -209,8 +209,25 @@ function doBan(c){
   });
 }
 function doPick(c){
-  const t=pickOrder[room.draft.current]; if(t!==role)return;
-  updateDraft(d=>{d.picks.push({team:t,name:c.name,img:c.img});d.current++;if(d.current>=pickOrder.length){d.phase="done";d.current=pickOrder.length-1;}})
+  const t = pickOrder[room.draft.current];
+  if(t !== role) return;
+
+  updateDraft(d => {
+    if(!Array.isArray(d.picks)) d.picks = [];
+
+    d.picks.push({
+      team: t,
+      name: c.name,
+      img: c.img
+    });
+
+    d.current++;
+
+    if(d.current >= pickOrder.length){
+      d.phase = "done";
+      d.current = pickOrder.length - 1;
+    }
+  });
 }
 function undo(){
   if(!canControl())return;
