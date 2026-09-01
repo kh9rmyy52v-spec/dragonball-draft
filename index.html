@@ -129,7 +129,7 @@ function setJoinUI(){
   $('roleLabel').textContent=role==="spectator"?"👀 観戦中":`あなた：TEAM ${role}`;
   $('turnHint').textContent=myTurn()?"あなたのターンです。キャラクターを選択できます。":currentTeam()?`${teamName(currentTeam())}のターンです。`:"ドラフト完了";
   $('nameA').disabled=role!=="A"; $('nameB').disabled=role!=="B";
-  $('undo').disabled=!canControl(); $('reset').disabled=!canControl();
+  $('undo').disabled=!canControl(); $('reset').disabled=false;
 }
 
 async function ensureRoom(){
