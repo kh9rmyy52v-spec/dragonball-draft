@@ -192,6 +192,33 @@ function defaultRoom(){
   };
 }
 
+function normalizeState(x){
+  const d=defaultRoom();
+  x=x&&typeof x==="object"?x:{};
+  x.settings={...d.settings,...(x.settings&&typeof x.settings==="object"?x.settings:{})};
+  x.draft={...d.draft,...(x.draft&&typeof x.draft==="object"?x.draft:{})};
+  x.draft.bans=Array.isArray(x.draft.bans)?x.draft.bans:[];
+  x.draft.picks=Array.isArray(x.draft.picks)?x.draft.picks:[];
+  x.players=x.players&&typeof x.players==="object"?x.players:{};
+  return x;
+}
+
+function renderCharacters(){
+  const box=$("chars");
+  if(!box)return;
+  const q=$("search").value.trim().toLowerCase();
+  box.innerHTML=chars.map((name,i)=>{
+    const d=state&&state.draft?state.draft:{bans:[],picks:[],phase:"ban",current:0};
+    const total=(d.bans||[]).length+(d.picks||[]).length;
+    const done=total>=12;
+    const team=d.phase==="ban"?banOrder[d.current]:pickOrder[d.current-4];
+    const can=role==="A"||role==="B";
+    const disabled=!can||done||role!==team||usedIndexes().includes(i);
+    return `<button type="button" class="char" data-i="${i}" ${disabled?"disabled":""}><img src="${imgUrl(i)}" loading="lazy"><span>${name}<br><span class="small muted">#${i+1}</span></span></button>`;
+  }).filter((_,i)=>!q||chars[i].toLowerCase().includes(q)).join("");
+  box.querySelectorAll(".char[data-i]").forEach(b=>b.onclick=()=>pickChar(Number(b.dataset.i)));
+}
+
 async function ensureRoom(id){
   const existing=await apiGet("rooms/"+id);
   if(existing) return existing;
@@ -316,8 +343,7 @@ function sessionId(){
 }
 
 async function startRoom(){
-  state=await apiGet("rooms/"+roomId);
-  if(!state) state=defaultRoom();
+  state=normalizeState(await apiGet("rooms/"+roomId));
   showOnly("app");
   $("roomLabel").textContent=roomId;
   $("nameAInput").value=state.settings?.nameA||"TEAM A";
@@ -354,7 +380,7 @@ function startRealtime(){
 }
 
 function applyStream(msg){
-  if(msg.path==="/"){state=msg.data||defaultRoom()}
+  if(msg.path==="/"){state=normalizeState(msg.data)}
   else{
     const parts=msg.path.split("/").filter(Boolean);
     let target=state;
@@ -367,60 +393,101 @@ function applyStream(msg){
 async function refresh(){
   try{
     const s=await apiGet("rooms/"+roomId);
-    if(s){state=s;render()}
+    if(s){state=normalizeState(s);render()}
   }catch(e){console.warn(e)}
 }
 
 function usedIndexes(){
   const used=[];
-  (state?.draft?.bans||[]).forEach(x=>used.push(x.index));
-  (state?.draft?.picks||[]).forEach(x=>used.push(x.index));
+  const d=(state && state.draft && typeof state.draft==="object")?state.draft:{};
+  (Array.isArray(d.bans)?d.bans:[]).forEach(x=>{
+    if(x && Number.isInteger(x.index)) used.push(x.index);
+  });
+  (Array.isArray(d.picks)?d.picks:[]).forEach(x=>{
+    if(x && Number.isInteger(x.index)) used.push(x.index);
+  });
   return used;
 }
 
 function renderSlots(){
-  const d=state.draft||{bans:[],picks:[]};
+  if(!state || typeof state!=="object") state=defaultRoom();
+
+  const rawDraft=state.draft;
+  const d=(rawDraft && typeof rawDraft==="object" && !Array.isArray(rawDraft))
+    ? rawDraft
+    : {bans:[],picks:[],phase:"ban",current:0};
+
+  const bans=Array.isArray(d.bans)?d.bans:[];
+  const picks=Array.isArray(d.picks)?d.picks:[];
+
   const make=(arr,type,team)=>{
-    return arr.filter(x=>x.team===team).map(x=>{
+    const safe=Array.isArray(arr)?arr:[];
+    return safe.filter(x=>x && x.team===team && Number.isInteger(x.index) && x.index>=0 && x.index<chars.length).map(x=>{
       const i=x.index;
       return `<div class="slot"><img src="${imgUrl(i)}"><div><b>${type}</b><br>${chars[i]}<div class="small muted">#${i+1}</div></div></div>`;
     }).join("") || `<div class="slot muted">まだありません</div>`;
   };
-  $("aBans").innerHTML=make(d.bans,"BAN","A");
-  $("bBans").innerHTML=make(d.bans,"BAN","B");
-  $("aPicks").innerHTML=make(d.picks,"PICK","A");
-  $("bPicks").innerHTML=make(d.picks,"PICK","B");
+
+  $("aBans").innerHTML=make(bans,"BAN","A");
+  $("bBans").innerHTML=make(bans,"BAN","B");
+  $("aPicks").innerHTML=make(picks,"PICK","A");
+  $("bPicks").innerHTML=make(picks,"PICK","B");
 }
 
 function render(){
-  if(!state)return;
-  $("nameA").textContent=state.settings?.nameA||"TEAM A";
-  $("nameB").textContent=state.settings?.nameB||"TEAM B";
+  if(!state || typeof state!=="object") state=defaultRoom();
+
+  // Firebaseから来たデータが欠けていても画面を止めない
+  const settings=(state.settings && typeof state.settings==="object" && !Array.isArray(state.settings))
+    ? state.settings : {};
+  const draft=(state.draft && typeof state.draft==="object" && !Array.isArray(state.draft))
+    ? state.draft : {};
+  const bans=Array.isArray(draft.bans)?draft.bans:[];
+  const picks=Array.isArray(draft.picks)?draft.picks:[];
+  const phase=draft.phase==="pick"?"pick":"ban";
+  const current=Number.isInteger(draft.current)?draft.current:0;
+
+  $("nameA").textContent=settings.nameA||"TEAM A";
+  $("nameB").textContent=settings.nameB||"TEAM B";
   renderSlots();
 
-  const d=state.draft||{bans:[],picks:[],phase:"ban",current:0};
-  const total=d.bans.length+d.picks.length;
+  const total=bans.length+picks.length;
   const done=total>=12;
   let currentTeam=null,label="";
-  if(!done && d.phase==="ban"){currentTeam=banOrder[d.current]||null;label=`BAN ${d.bans.length+1}/4`}
-  else if(!done){currentTeam=pickOrder[d.current-4]||null;label=`PICK ${d.picks.length+1}/8`}
-  $("currentText").innerHTML=done?`<b>🎉 DRAFT COMPLETE</b>`:`現在：<b>TEAM ${currentTeam}</b><br><span class="muted">${label}</span>`;
+  if(!done && phase==="ban"){
+    currentTeam=banOrder[current]||null;
+    label=`BAN ${bans.length+1}/4`;
+  }else if(!done){
+    currentTeam=pickOrder[Math.max(0,current-4)]||null;
+    label=`PICK ${picks.length+1}/8`;
+  }
 
-  const q=$("search").value.trim().toLowerCase();
+  $("currentText").innerHTML=done
+    ? `<b>🎉 DRAFT COMPLETE</b>`
+    : `現在：<b>TEAM ${currentTeam||"—"}</b><br><span class="muted">${label}</span>`;
+
+  const q=($("search").value||"").trim().toLowerCase();
   const used=usedIndexes();
+
   $("chars").innerHTML=chars.map((name,i)=>{
-    const disabled=used.includes(i)||done||!currentTeam||(role!=="A"&&role!=="B")||(role!==currentTeam);
-    return `<button class="char" data-i="${i}" ${disabled?"disabled":""}>
-      <img src="${imgUrl(i)}"><span>${name}<br><span class="small muted">#${i+1}</span></span>
+    const disabled=used.includes(i)||done||!currentTeam||
+      (role!=="A"&&role!=="B")||(role!==currentTeam);
+
+    return `<button type="button" class="char" data-i="${i}" ${disabled?"disabled":""}>
+      <img src="${imgUrl(i)}" alt="${name}" loading="lazy">
+      <span>${name}<br><span class="small muted">#${i+1}</span></span>
     </button>`;
   }).filter((_,i)=>!q||chars[i].toLowerCase().includes(q)).join("");
 
-  $("chars").querySelectorAll("[data-i]").forEach(b=>b.addEventListener("click",()=>pickChar(+b.dataset.i)));
+  $("chars").querySelectorAll(".char[data-i]").forEach(btn=>{
+    btn.onclick=()=>pickChar(Number(btn.dataset.i));
+  });
+
   $("message").textContent=
     role==="A"||role==="B"
       ? (role===currentTeam
           ? `あなたは TEAM ${role} です。キャラクターを選択できます。`
-          : `あなたは TEAM ${role} です。現在は TEAM ${currentTeam} の番です。`)
+          : `あなたは TEAM ${role} です。現在は TEAM ${currentTeam||"—"} の番です。`)
       : "観戦モード";
 }
 
@@ -527,6 +594,8 @@ $("resetBtn").onclick=resetDraft;
 $("nameAInput").onchange=()=>setTeamName("A",$("nameAInput").value);
 $("nameBInput").onchange=()=>setTeamName("B",$("nameBInput").value);
 $("leaveBtn").onclick=()=>{if(stream)stream.close();if(pollTimer)clearInterval(pollTimer);location.href=location.pathname};
+
+renderCharacters();
 
 (async function boot(){
   const id=new URLSearchParams(location.search).get("room");
