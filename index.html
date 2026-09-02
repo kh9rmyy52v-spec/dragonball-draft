@@ -122,7 +122,7 @@ input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid #3a4353;b
       <section class="center">
         <div class="current" id="currentText">読み込み中…</div>
         <input id="search" class="search" placeholder="キャラクターを検索">
-        <div id="chars" class="grid"></div>
+        <div id="chars" class="grid"><div class="muted">キャラクターを読み込み中…</div></div>
         <div class="row" style="margin-top:12px">
           <button id="undoBtn" class="secondary">↩ 取り消し</button>
           <button id="resetBtn" class="danger">⟳ リセット</button>
@@ -416,7 +416,12 @@ function render(){
   }).filter((_,i)=>!q||chars[i].toLowerCase().includes(q)).join("");
 
   $("chars").querySelectorAll("[data-i]").forEach(b=>b.addEventListener("click",()=>pickChar(+b.dataset.i)));
-  $("message").textContent=(role==="A"||role==="B")?`あなたは TEAM ${role} です。`: "観戦モード";
+  $("message").textContent=
+    role==="A"||role==="B"
+      ? (role===currentTeam
+          ? `あなたは TEAM ${role} です。キャラクターを選択できます。`
+          : `あなたは TEAM ${role} です。現在は TEAM ${currentTeam} の番です。`)
+      : "観戦モード";
 }
 
 async function pickChar(index){
@@ -525,7 +530,7 @@ $("leaveBtn").onclick=()=>{if(stream)stream.close();if(pollTimer)clearInterval(p
 
 (async function boot(){
   const id=new URLSearchParams(location.search).get("room");
-  if(id && /^\\d{4}$/.test(id)){
+  if(id && /^\d{4}$/.test(id)){
     try{
       const data=await apiGet("rooms/"+id);
       if(data){
@@ -544,31 +549,6 @@ $("leaveBtn").onclick=()=>{if(stream)stream.close();if(pollTimer)clearInterval(p
     }
   }
 })();
-
-/* CHARACTER_CLICK_FIX_V2 */
-document.addEventListener("click", (ev) => {
-  const card = ev.target.closest("[data-char], [data-character], .char-card, .character-card, .character");
-  if (!card) return;
-
-  // Do not interfere with disabled/already-used characters.
-  if (card.disabled || card.getAttribute("aria-disabled") === "true" ||
-      card.classList.contains("disabled") || card.classList.contains("used")) return;
-
-  // If the original card has a button inside, let that button's handler run.
-  if (ev.target.closest("button") && ev.target !== card) return;
-
-  const id = card.dataset.char || card.dataset.character || card.dataset.id;
-  if (!id) return;
-
-  // Call the existing character-selection function when available.
-  if (typeof selectCharacter === "function") {
-    ev.preventDefault();
-    selectCharacter(id);
-  } else if (typeof chooseCharacter === "function") {
-    ev.preventDefault();
-    chooseCharacter(id);
-  }
-});
 
 </script>
 </body>
