@@ -503,7 +503,7 @@ async function setTeamName(team,value){
 
 $("createBtn").onclick=createRoom;
 $("joinBtn").onclick=joinRoom;
-$("roomInput").addEventListener("input",e=>e.target.value=e.target.value.replace(/\\D/g,"").slice(0,4));
+$("roomInput").addEventListener("input",e=>e.target.value=e.target.value.replace(/\D/g,"").slice(0,4));
 $("teamABtn").onclick=()=>selectRole("A");
 $("teamBBtn").onclick=()=>selectRole("B");
 $("spectatorBtn").onclick=()=>selectRole("S");
