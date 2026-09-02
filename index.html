@@ -160,16 +160,9 @@ function pathUrl(path){return DB+"/"+path.split("/").map(encodeURIComponent).joi
 function roomUrlFor(id){return location.origin+location.pathname+"?room="+id}
 
 async function apiGet(path){
-  // GETでは print=silent を付けない（Firebase REST APIのGETでは
-  // データ本体を確実に受け取るため）
-  const r=await fetch(pathUrl(path),{
-    method:"GET",
-    cache:"no-store"
-  });
-  if(!r.ok) throw new Error("GET "+r.status+" "+await r.text());
-  if(r.status===204)return null;
-  const text=await r.text();
-  return text ? JSON.parse(text) : null;
+  const r=await fetch(pathUrl(path)+"?print=silent",{cache:"no-store"});
+  if(!r.ok) throw new Error("GET "+r.status);
+  return r.status===204?null:r.json();
 }
 async function apiPut(path,data){
   const r=await fetch(pathUrl(path),{
