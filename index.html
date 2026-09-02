@@ -454,11 +454,10 @@ async function pickChar(index){
     }
 
     $('message').textContent="反映中…";
-    const latest=await apiGet("rooms/"+roomId);
-    const ld=latest && latest.draft ? latest.draft : {bans:[],picks:[],phase:"ban",current:0};
-    if(JSON.stringify(ld)!==JSON.stringify(d)){
-      state=latest; render(); $('message').textContent="他の操作が先に反映されました。"; return;
-    }
+
+    // このドラフトは「現在のチーム」だけが操作できるため、
+    // ここで古い状態とのJSON比較は行わず、そのまま最新のドラフトを書き込みます。
+    // EventSourceの更新タイミングによって誤って「他の操作が先に反映」と判定されるのを防ぎます。
     await apiPut("rooms/"+roomId+"/draft",next);
     state.draft=next;
     render();
