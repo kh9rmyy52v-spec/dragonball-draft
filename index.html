@@ -39,6 +39,17 @@ input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid #3a4353;b
 .small{font-size:12px}
 @media(max-width:850px){.layout{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}}
 </style>
+<style>
+/* Character interaction fallback */
+.character-card, .char-card, [data-char], [data-character] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.character-card.disabled, .char-card.disabled, [data-char].disabled, [data-character].disabled,
+.character-card.used, .char-card.used, [data-char].used, [data-character].used {
+  cursor: not-allowed;
+}
+</style>
 </head>
 <body>
 
@@ -160,7 +171,7 @@ function pathUrl(path){return DB+"/"+path.split("/").map(encodeURIComponent).joi
 function roomUrlFor(id){return location.origin+location.pathname+"?room="+id}
 
 async function apiGet(path){
-  const r=await fetch(pathUrl(path)+"?print=silent",{cache:"no-store"});
+  const r=await fetch(pathUrl(path),{cache:"no-store"});
   if(!r.ok) throw new Error("GET "+r.status);
   return r.status===204?null:r.json();
 }
@@ -228,7 +239,7 @@ async function createRoom(){
 
 async function joinRoom(){
   const id=$("roomInput").value.trim();
-  if(!/^\\d{4}$/.test(id)){
+  if(!/^\d{4}$/.test(id)){
     $("roomStatus").textContent="4桁の数字を入力してください。";
     return;
   }
@@ -533,6 +544,32 @@ $("leaveBtn").onclick=()=>{if(stream)stream.close();if(pollTimer)clearInterval(p
     }
   }
 })();
+
+/* CHARACTER_CLICK_FIX_V2 */
+document.addEventListener("click", (ev) => {
+  const card = ev.target.closest("[data-char], [data-character], .char-card, .character-card, .character");
+  if (!card) return;
+
+  // Do not interfere with disabled/already-used characters.
+  if (card.disabled || card.getAttribute("aria-disabled") === "true" ||
+      card.classList.contains("disabled") || card.classList.contains("used")) return;
+
+  // If the original card has a button inside, let that button's handler run.
+  if (ev.target.closest("button") && ev.target !== card) return;
+
+  const id = card.dataset.char || card.dataset.character || card.dataset.id;
+  if (!id) return;
+
+  // Call the existing character-selection function when available.
+  if (typeof selectCharacter === "function") {
+    ev.preventDefault();
+    selectCharacter(id);
+  } else if (typeof chooseCharacter === "function") {
+    ev.preventDefault();
+    chooseCharacter(id);
+  }
+});
+
 </script>
 </body>
 </html>
