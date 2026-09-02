@@ -249,24 +249,49 @@ async function joinRoom(){
 
 async function selectRole(r){
   role=r;
+
   const key="topsquadra_role_"+roomId;
   localStorage.setItem(key,r);
+
   try{
-    state=await apiGet("rooms/"+roomId);
-    if(!state.players) state.players={};
+    // Firebaseから現在のルームを取得
+    const latest=await apiGet("rooms/"+roomId);
+
+    if(!latest){
+      $("roleStatus").textContent=
+        "ルームデータを取得できませんでした。ルームIDを確認してください。";
+      return;
+    }
+
+    state=latest;
+
+    if(!state.players){
+      state.players={};
+    }
+
     if(r==="A"||r==="B"){
-      const other=r==="A"?"B":"A";
-      if(state.players[r] && state.players[r]!==sessionId()){
-        $("roleStatus").textContent="そのチームはすでに参加者がいます。";
+      const current=state.players[r];
+
+      if(current && current!==sessionId()){
+        $("roleStatus").textContent=
+          "そのチームはすでに参加者がいます。";
         return;
       }
+
       state.players[r]=sessionId();
-      await apiPut("rooms/"+roomId+"/players",state.players);
+
+      await apiPut(
+        "rooms/"+roomId+"/players",
+        state.players
+      );
     }
+
     await startRoom();
+
   }catch(e){
-    console.error(e);
-    $("roleStatus").textContent="入室に失敗しました。";
+    console.error("入室エラー:",e);
+    $("roleStatus").textContent=
+      "入室に失敗しました。もう一度お試しください。";
   }
 }
 
