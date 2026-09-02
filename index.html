@@ -94,7 +94,9 @@ const firebaseConfig={
 };
 const firebaseApp=initializeApp(firebaseConfig);
 const db=getDatabase(firebaseApp);
-const roomRef=ref(db,"rooms/main");
+const roomId = new URLSearchParams(location.search).get("room") || "main";
+const roomPath = `rooms/${roomId}`;
+const roomRef = ref(db, roomPath);
 
 const $=id=>document.getElementById(id);
 const clientId=localStorage.getItem("topsquadra_client_id")||crypto.randomUUID();
@@ -139,7 +141,7 @@ async function ensureRoom(){
 
 async function claimTeam(t){
   $('joinStatus').textContent=`TEAM ${t}の空きを確認中…`;
-  const pRef=ref(db,`rooms/main/players/${t}`);
+  const pRef=ref(db,`${roomPath}/players/${t}`);
   const result=await runTransaction(pRef,current=>{
     const now=Date.now();
     if(!current || current.id===clientId || !current.lastSeen || now-current.lastSeen>30000){return {id:clientId,lastSeen:now};}
@@ -152,7 +154,7 @@ async function claimTeam(t){
 async function joinSpectator(){role="spectator";localStorage.setItem("topsquadra_role",role);setJoinUI();render()}
 async function leaveRole(){
   if(role==="A"||role==="B"){
-    const pRef=ref(db,`rooms/main/players/${role}`);
+    const pRef=ref(db,`${roomPath}/players/${role}`);
     await runTransaction(pRef,current=>current&&current.id===clientId?null:current);
   }
   role=null;localStorage.removeItem("topsquadra_role");setJoinUI();render();
@@ -160,14 +162,14 @@ async function leaveRole(){
 
 async function touchPresence(){
   if(role==="A"||role==="B"){
-    const pRef=ref(db,`rooms/main/players/${role}`);
+    const pRef=ref(db,`${roomPath}/players/${role}`);
     await runTransaction(pRef,current=>current&&current.id===clientId?{...current,lastSeen:Date.now()}:current);
   }
 }
 
 function selectChar(c){if(!canControl())return;if(room.draft.phase==="ban")doBan(c);else if(room.draft.phase==="pick")doPick(c)}
 async function updateDraft(mutator){
-  const dRef = ref(db,"rooms/main/draft");
+  const dRef = ref(db,`${roomPath}/draft`);
 
   const result = await runTransaction(dRef,current=>{
     current = current || {};
@@ -255,7 +257,7 @@ function resetDraft(){
 async function writeTeamName(t,val){
   if(suppressNameWrite||role!==t)return;
   const key=t==="A"?"nameA":"nameB";
-  await set(ref(db,`rooms/main/settings/${key}`),val.trim()||`TEAM ${t}`);
+  await set(ref(db,`${roomPath}/settings/${key}`),val.trim()||`TEAM ${t}`);
 }
 
 function renderTeams(){for(const t of ["A","B"]){const el=$("slots"+t);el.innerHTML="";const mine=room.draft.picks.filter(p=>p.team===t);for(let i=0;i<4;i++){const s=document.createElement("div");s.className="slot"+(mine[i]?" filled":"");if(mine[i]){const im=document.createElement("img");im.src=mine[i].img;im.title=mine[i].name;s.appendChild(im)}else s.textContent="PICK "+(i+1);el.appendChild(s)}$("team"+t).classList.toggle("active",room.draft.phase==="pick"&&pickOrder[room.draft.current]===t)}}
